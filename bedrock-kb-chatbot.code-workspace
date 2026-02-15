@@ -1,0 +1,24 @@
+{
+  "folders": [
+    {
+      "path": ".",
+      "name": "root",
+    },
+    {
+      "path": "doc"
+    },
+    {
+      "path": "web"
+    },
+    {
+      "path": "infra",
+    },
+  ],
+  "settings": {
+    "files.exclude": {
+      "doc": true,
+      "web": true,
+      "infra": true,
+    },
+  },
+}

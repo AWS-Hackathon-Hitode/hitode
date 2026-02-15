@@ -1,0 +1,18 @@
+{
+  "recommendations": [
+    // Biome - コードフォーマッターとリンター
+    "biomejs.biome",
+
+    // Draw.io editor
+    "hediet.vscode-drawio",
+
+    // playwright
+    "ms-playwright.playwright",
+    
+    // その他の推奨拡張機能
+    "bradlc.vscode-tailwindcss",
+    "formulahendry.auto-rename-tag",
+    "steoates.autoimport",
+    "amazonwebservices.aws-toolkit-vscode"
+  ]
+}
