@@ -48,6 +48,13 @@ export class AmazonBedrockKbStack extends cdk.Stack {
     const tag = `bedrock-kb-${stage}`;
     const bucketName = `${tag}-${this.account}`;
 
+    // 【追加】動画・音声をアップロードするための「生データ用」バケット
+    const rawVideoBucket = new aws_s3.Bucket(this, "RawVideoBucket", {
+      bucketName: `${tag}-raw-video-${this.account}`,
+      removalPolicy: RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
+    });
+
     // S3 bucket for the data source
     const dataSourceBucket = new aws_s3.Bucket(this, "DataSourceBucket", {
       bucketName: bucketName,
@@ -61,6 +68,18 @@ export class AmazonBedrockKbStack extends cdk.Stack {
         },
       ],
     });
+
+    const sagemakerRole = new aws_iam.Role(this, "SageMakerRole", {
+      assumedBy: new aws_iam.ServicePrincipal("sagemaker.amazonaws.com"),
+      description: "Role for SageMaker processing job to transcribe videos",
+    });
+
+    // 【追加】SageMakerロールへの権限付与
+    rawVideoBucket.grantRead(sagemakerRole);          // 生動画を読み込む権限
+    dataSourceBucket.grantReadWrite(sagemakerRole);   // 解析後のJSONを書き出す権限
+    sagemakerRole.addManagedPolicy(
+      aws_iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSageMakerFullAccess")
+    );
 
     // S3 bucket for intermediate transformation storage
     const transformationBucket = new aws_s3.Bucket(
@@ -162,6 +181,8 @@ export class AmazonBedrockKbStack extends cdk.Stack {
       }),
     });
 
+
+
     // Confluence Data Source (if configured)
     if (confluence) {
       knowledgeBase.addConfluenceDataSource({
@@ -188,6 +209,18 @@ export class AmazonBedrockKbStack extends cdk.Stack {
     }
 
     // Outputs
+    // 【追加】Aさんが使用するリソース情報の出力
+    new CfnOutput(this, "RawVideoBucketName", {
+      value: rawVideoBucket.bucketName,
+      description: "Bucket for uploading raw video/audio files",
+    });
+
+    new CfnOutput(this, "SageMakerRoleArn", {
+      value: sagemakerRole.roleArn,
+      description: "IAM Role ARN for SageMaker processing job",
+    });
+
+
     new CfnOutput(this, "KnowledgeBaseId", {
       value: knowledgeBase.knowledgeBaseId,
       description: "Knowledge Base ID",
