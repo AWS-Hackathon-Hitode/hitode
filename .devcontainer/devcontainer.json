@@ -1,18 +1,21 @@
-// .devcontainer/devcontainer.json
-
 {
   "name": "Hitode",
   "dockerComposeFile": "docker-compose.yml",
   "service": "web",
   "workspaceFolder": "/workspaces",
 
-  // コンテナ作成後に自動実行
+  
+  "features": {
+    "ghcr.io/devcontainers/features/aws-cli:1": {}
+  },
+
+
+  "mounts": [
+    "source=${localEnv:HOME}/.aws,target=/home/node/.aws,type=bind,consistency=cached"
+  ],
+
   "postCreateCommand": "sudo chown -R node:node /workspaces/web/node_modules && cd /workspaces/web && pnpm install && cd /workspaces/infra && pnpm install",
 
-  // コンテナ起動後に自動実行
-  //"postStartCommand": {"web": "cd web"},
-
-  // VS Code拡張機能（Dev Container内のみ）
   "customizations": {
     "vscode": {
       "settings": {

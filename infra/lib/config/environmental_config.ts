@@ -39,6 +39,20 @@ export interface EnvironmentConfig {
   };
 
   /**
+   * Image Search の設定
+   */
+  imageSearch?: {
+    /**
+     * Bedrock VLM モデルID (Claude Vision)
+     */
+    vlmModelId: string;
+    /**
+     * Bedrock Embedding モデルID
+     */
+    embeddingModelId: string;
+  };
+
+  /**
    * Bedrock Knowledge Base の設定
    */
   bedrockKb?: {
@@ -100,30 +114,26 @@ const environmentConfigs: { [key: string]: EnvironmentConfig } = {
       cidr: "10.0.0.0/16",
       maxAzs: 2,
     },
-    videoSearch: {
-      sagemakerInstanceType: "ml.m5.large",
+    imageSearch: {
+      vlmModelId: "us.anthropic.claude-sonnet-4-20250514-v1:0",
       embeddingModelId: "amazon.titan-embed-text-v2:0",
-      ocrModelId: "anthropic.claude-sonnet-4-20250514-v1:0",
     },
-    bedrockKb: {
-      embeddingModelArn:
-        "arn:aws:bedrock:ap-northeast-1::foundation-model/amazon.titan-embed-text-v1",
-      aurora: {
-        instanceType: "t3.medium",
-        version: "16.4",
-      },
-      confluence: {
-        confluenceAppKey: process.env.CONFLUENCE_APP_KEY ?? "",
-        confluenceAppSecret: process.env.CONFLUENCE_APP_SECRET ?? "",
-        confluenceAccessToken: process.env.CONFLUENCE_ACCESS_TOKEN ?? "",
-        confluenceRefreshToken: process.env.CONFLUENCE_REFRESH_TOKEN ?? "",
-        hostUrl: process.env.CONFLUENCE_HOST_URL ?? "",
-        spaces:
-          process.env.CONFLUENCE_SPACES?.split(",").filter(
-            (s) => s.trim() !== "",
-          ) || [],
-      },
-    },
+    // videoSearch は SageMakerCreateProcessingJob が CDK 2.225.0 未対応のため一時コメントアウト
+    // videoSearch: {
+    //   sagemakerInstanceType: "ml.m5.large",
+    //   embeddingModelId: "amazon.titan-embed-text-v2:0",
+    //   ocrModelId: "anthropic.claude-sonnet-4-20250514-v1:0",
+    // },
+    // bedrockKb は Docker が必要なため、必要時に有効化してください
+    // bedrockKb: {
+    //   embeddingModelArn:
+    //     "arn:aws:bedrock:ap-northeast-1::foundation-model/amazon.titan-embed-text-v1",
+    //   aurora: {
+    //     instanceType: "t3.medium",
+    //     version: "16.4",
+    //   },
+    //   confluence: { ... },
+    // },
   },
 };
 

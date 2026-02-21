@@ -3,9 +3,11 @@ import * as cdk from "aws-cdk-lib";
 import * as dotenv from "dotenv";
 import { getConfig } from "../lib/config/environmental_config";
 import { AmazonBedrockKbStack } from "../lib/stack/bedrock-kb-stack";
+import { ImageSearchStack } from "../lib/stack/image-search-stack";
+import { NetworkStack } from "../lib/stack/network-stack";
 import { SecretsStack } from "../lib/stack/secrets-stack";
-import { VideoStorageStack } from "../lib/stack/video-storage-stack";
 import { VideoProcessingStack } from "../lib/stack/video-processing-stack";
+import { VideoStorageStack } from "../lib/stack/video-storage-stack";
 
 dotenv.config();
 
@@ -23,6 +25,14 @@ const env = {
   region: process.env.CDK_DEFAULT_REGION ?? process.env.AWS_REGION,
 };
 
+// --- Network スタック（VPC）---
+const networkStack = new NetworkStack(app, `NetworkStack${stagePrefix}`, {
+  stage,
+  vpcCidr: config.vpc.cidr,
+  maxAzs: config.vpc.maxAzs,
+  env,
+});
+
 // Secrets スタック（認証情報を管理）
 const secretsStack = new SecretsStack(app, `SecretsStack${stagePrefix}`, {
   stage,
@@ -39,26 +49,33 @@ const secretsStack = new SecretsStack(app, `SecretsStack${stagePrefix}`, {
   env,
 });
 
-// Bedrock Knowledge Base スタック
+// Bedrock Knowledge Base スタック（オプション）
 const bedrockKbConfig = config.bedrockKb;
-if (!bedrockKbConfig) {
-  throw new Error(
-    `Bedrock KB configuration is not defined for environment: ${stage}`,
-  );
+if (bedrockKbConfig) {
+  new AmazonBedrockKbStack(app, `BedrockKbStack${stagePrefix}`, {
+    stage,
+    confluence:
+      bedrockKbConfig.confluence && secretsStack.confluenceSecretArn
+        ? {
+            secretArn: secretsStack.confluenceSecretArn,
+            hostUrl: bedrockKbConfig.confluence.hostUrl,
+            spaces: bedrockKbConfig.confluence.spaces,
+          }
+        : undefined,
+    env,
+  });
 }
 
-new AmazonBedrockKbStack(app, `BedrockKbStack${stagePrefix}`, {
-  stage,
-  confluence:
-    bedrockKbConfig.confluence && secretsStack.confluenceSecretArn
-      ? {
-          secretArn: secretsStack.confluenceSecretArn,
-          hostUrl: bedrockKbConfig.confluence.hostUrl,
-          spaces: bedrockKbConfig.confluence.spaces,
-        }
-      : undefined,
-  env,
-});
+// --- Image Search スタック ---
+const imageSearchConfig = config.imageSearch;
+if (imageSearchConfig) {
+  new ImageSearchStack(app, `ImageSearchStack${stagePrefix}`, {
+    stage,
+    config: imageSearchConfig,
+    vpc: networkStack.vpc,
+    env,
+  });
+}
 
 // --- Video Search スタック ---
 const videoSearchConfig = config.videoSearch;

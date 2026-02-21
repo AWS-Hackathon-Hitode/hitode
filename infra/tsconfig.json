@@ -22,5 +22,8 @@
     "rootDir": "./",
     "esModuleInterop": true
   },
-  "exclude": ["node_modules", "cdk.out", "dist"]
+  "exclude": ["node_modules", "cdk.out", "dist", "lib/lambda"],
+  "ts-node": {
+    "transpileOnly": true
+  }
 }
