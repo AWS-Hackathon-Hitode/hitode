@@ -1,0 +1,25 @@
+# .devcontainer/docker-compose.yml
+
+services:
+  # サービスA: web(Next.js)
+  web:
+    image: mcr.microsoft.com/devcontainers/typescript-node:20-bookworm
+    container_name: bedrock-kb-webapp
+    volumes:
+      - ..:/workspaces
+      - web_node_modules_vol:/workspaces/web/node_modules
+    ports:
+      - "3000:3000" # Next.js 開発サーバー
+    environment:
+      - NODE_ENV=development
+      - CHOKIDAR_USEPOLLING=true
+    env_file:
+      - ../web/.env.local
+    command: sleep infinity
+    user: node
+    #depends_on: # searxngが起動してからwebappを起動
+    #- searxng
+
+# 名前付きボリュームの定義
+volumes:
+  web_node_modules_vol:

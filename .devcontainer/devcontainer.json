@@ -1,0 +1,41 @@
+// .devcontainer/devcontainer.json
+
+{
+  "name": "Hitode",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "web",
+  "workspaceFolder": "/workspaces",
+
+  // コンテナ作成後に自動実行
+  "postCreateCommand": "sudo chown -R node:node /workspaces/web/node_modules && cd /workspaces/web && pnpm install && cd /workspaces/infra && pnpm install",
+
+  // コンテナ起動後に自動実行
+  //"postStartCommand": {"web": "cd web"},
+
+  // VS Code拡張機能（Dev Container内のみ）
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "eslint.runtime": "/usr/local/bin/node",
+        "typescript.preferences.includePackageJsonAutoImports": "auto"
+      },
+      "extensions": [
+        "ms-vscode.vscode-typescript-next",
+        "esbenp.prettier-vscode",
+        "ms-vscode.vscode-eslint",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "bradlc.vscode-tailwindcss",
+        "ms-vscode.vscode-json"
+      ]
+    }
+  },
+
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": {
+      "label": "Next.js App",
+      "protocol": "http"
+    }
+  }
+}
