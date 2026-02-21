@@ -7,7 +7,7 @@
   "workspaceFolder": "/workspaces",
 
   // コンテナ作成後に自動実行
-  "postCreateCommand": "sudo chown -R node:node /workspaces/web/node_modules && cd /workspaces/web && pnpm install",
+  "postCreateCommand": "sudo chown -R node:node /workspaces/web/node_modules && cd /workspaces/web && pnpm install && cd /workspaces/infra && pnpm install",
 
   // コンテナ起動後に自動実行
   //"postStartCommand": {"web": "cd web"},
