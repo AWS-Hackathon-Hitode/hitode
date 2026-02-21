@@ -1,40 +1,23 @@
 import * as path from "node:path";
-import {
-  bedrock,
-  opensearchserverless,
-} from "@cdklabs/generative-ai-cdk-constructs";
 import * as cdk from "aws-cdk-lib";
 import {
   aws_iam,
   aws_s3,
-  aws_secretsmanager,
+  aws_lambda as lambda,
+  aws_lambda_nodejs as nodejs,
   CfnOutput,
-  Duration,
   RemovalPolicy,
 } from "aws-cdk-lib";
-import * as lambda from "aws-cdk-lib/aws-lambda";
-import * as nodejs from "aws-cdk-lib/aws-lambda-nodejs";
+import * as s3_notifications from "aws-cdk-lib/aws-s3-notifications";
+import {
+  bedrock,
+  opensearchserverless,
+} from "@cdklabs/generative-ai-cdk-constructs";
 import type { Construct } from "constructs";
+import { getConfig } from "../config/environmental_config";
 
 interface BedrockKbStackProps extends cdk.StackProps {
   stage: string;
-  /**
-   * Confluence設定（オプショナル）
-   */
-  confluence?: {
-    /**
-     * Confluence Secret ARN
-     */
-    secretArn: string;
-    /**
-     * ConfluenceのホストURL
-     */
-    hostUrl: string;
-    /**
-     * 対象とするスペース
-     */
-    spaces: string[];
-  };
 }
 
 export class AmazonBedrockKbStack extends cdk.Stack {
@@ -43,230 +26,85 @@ export class AmazonBedrockKbStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: BedrockKbStackProps) {
     super(scope, id, props);
 
-    const { stage, confluence } = props;
-
+    const { stage } = props;
+    const config = getConfig(stage);
     const tag = `bedrock-kb-${stage}`;
-    const bucketName = `${tag}-${this.account}`;
 
-    // 【追加】動画・音声をアップロードするための「生データ用」バケット
-    const rawVideoBucket = new aws_s3.Bucket(this, "RawVideoBucket", {
-      bucketName: `${tag}-raw-video-${this.account}`,
+    // 1. バケット定義
+    const rawImageBucket = new aws_s3.Bucket(this, "RawImageBucket", {
+      bucketName: `${tag}-raw-image-${this.account}-${this.region}`,
       removalPolicy: RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
     });
 
-    // S3 bucket for the data source
     const dataSourceBucket = new aws_s3.Bucket(this, "DataSourceBucket", {
-      bucketName: bucketName,
+      bucketName: `${tag}-data-source-${this.account}-${this.region}`,
       removalPolicy: RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
       versioned: true,
-      lifecycleRules: [
-        {
-          id: "delete-old-versions",
-          noncurrentVersionExpiration: Duration.days(30),
-        },
-      ],
     });
 
+    // 2. SageMaker ロール
     const sagemakerRole = new aws_iam.Role(this, "SageMakerRole", {
       assumedBy: new aws_iam.ServicePrincipal("sagemaker.amazonaws.com"),
-      description: "Role for SageMaker processing job to transcribe videos",
     });
-
-    // 【追加】SageMakerロールへの権限付与
-    rawVideoBucket.grantRead(sagemakerRole);          // 生動画を読み込む権限
-    dataSourceBucket.grantReadWrite(sagemakerRole);   // 解析後のJSONを書き出す権限
+    rawImageBucket.grantRead(sagemakerRole);
+    dataSourceBucket.grantReadWrite(sagemakerRole);
     sagemakerRole.addManagedPolicy(
       aws_iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSageMakerFullAccess")
     );
 
-    // S3 bucket for intermediate transformation storage
-    const transformationBucket = new aws_s3.Bucket(
-      this,
-      "TransformationBucket",
-      {
-        bucketName: `${tag}-transformation-${this.account}`,
-        removalPolicy: RemovalPolicy.DESTROY,
-        autoDeleteObjects: true,
-        lifecycleRules: [
-          {
-            id: "delete-old-transformations",
-            expiration: Duration.days(7), // 中間ファイルは7日後に削除
-          },
-        ],
-      },
-    );
-
-    // OpenSearch Serverless Vector Collection
-    this.vectorCollection = new opensearchserverless.VectorCollection(
-      this,
-      "VectorCollection",
-      {
-        collectionName: `${tag}-collection`,
-        description: `Vector collection for ${stage} environment`,
-        standbyReplicas:
-          opensearchserverless.VectorCollectionStandbyReplicas.DISABLED, // コスト削減のため無効化
-      },
-    );
-
-    // Custom chunking Lambda function
-    const codeChunkingLambda = new nodejs.NodejsFunction(
-      this,
-      "CodeChunkingLambda",
-      {
-        entry: path.join(__dirname, "../lambda/code-chunking/index.ts"),
-        handler: "handler",
-        runtime: lambda.Runtime.NODEJS_24_X,
-        timeout: Duration.minutes(5),
-        memorySize: 1024,
-        bundling: {
-          nodeModules: [
-            "tree-sitter",
-            "tree-sitter-typescript",
-            "tree-sitter-javascript",
-            "tree-sitter-java",
-            "tree-sitter-c-sharp",
-          ],
-          externalModules: ["@aws-sdk/client-s3"],
-        },
-        environment: {
-          TRANSFORMATION_BUCKET: transformationBucket.bucketName,
-        },
-      },
-    );
-
-    // Grant permissions to Lambda
-    dataSourceBucket.grantRead(codeChunkingLambda);
-    transformationBucket.grantReadWrite(codeChunkingLambda);
-
-    // Knowledge Base の作成（IAM roleは自動作成される）
-    const knowledgeBase = new bedrock.VectorKnowledgeBase(
-      this,
-      "KnowledgeBase",
-      {
-        vectorStore: this.vectorCollection,
-        embeddingsModel:
-          bedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V2_1024,
-        name: `${tag}-knowledge-base`,
-        description: `Knowledge base for ${stage} environment with OpenSearch Serverless`,
-        instruction:
-          "Use this knowledge base to answer questions based on the provided documents.",
-      },
-    );
-
-    // Grant Bedrock Knowledge Base role access to transformation bucket
-    transformationBucket.grantReadWrite(knowledgeBase.role);
-
-    // Grant Bedrock reranking permission to the Knowledge Base role
-    knowledgeBase.role.addToPrincipalPolicy(
-      new aws_iam.PolicyStatement({
-        effect: aws_iam.Effect.ALLOW,
-        actions: ["bedrock:Rerank", "bedrock:InvokeModel"],
-        resources: [
-          // Allow reranking with any model (Rerank doesn't support resource-level permissions)
-          "*",
-        ],
-      }),
-    );
-
-    // S3 Data Source with custom transformation
-    knowledgeBase.addS3DataSource({
-      bucket: dataSourceBucket,
-      dataSourceName: `${tag}-s3-data-source`,
-      chunkingStrategy: bedrock.ChunkingStrategy.NONE,
-      customTransformation: bedrock.CustomTransformation.lambda({
-        lambdaFunction: codeChunkingLambda,
-        s3BucketUri: `s3://${transformationBucket.bucketName}/transformations/`,
-      }),
+    // 3. OpenSearch Serverless
+    this.vectorCollection = new opensearchserverless.VectorCollection(this, "VectorCollection", {
+      collectionName: `${tag}-collection`,
+      standbyReplicas: opensearchserverless.VectorCollectionStandbyReplicas.DISABLED,
     });
 
 
+    // 4. Knowledge Base (ここが重要：バリデーション回避)
+    // 一旦、標準の V1 モデルとしてインスタンスを作成
+    const model = bedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V1;
 
-    // Confluence Data Source (if configured)
-    if (confluence) {
-      knowledgeBase.addConfluenceDataSource({
-        dataSourceName: `${tag}-confluence-data-source`,
-        confluenceUrl: confluence.hostUrl,
-        authType:
-          bedrock.ConfluenceDataSourceAuthType.OAUTH2_CLIENT_CREDENTIALS,
-        authSecret: aws_secretsmanager.Secret.fromSecretCompleteArn(
-          this,
-          "ConfluenceSecret",
-          confluence.secretArn,
-        ),
-        chunkingStrategy: bedrock.ChunkingStrategy.SEMANTIC,
-        filters:
-          confluence.spaces.length > 0
-            ? [
-                {
-                  objectType: bedrock.ConfluenceObjectType.SPACE,
-                  includePatterns: confluence.spaces,
-                },
-              ]
-            : undefined,
-      });
-    }
+    // 型定義の裏をかいて、modelId と次元数を「画像用」に直接上書きする
+    // (JavaScript の柔軟性を利用して、読み取り専用プロパティを書き換えます)
+    const knowledgeBase = new bedrock.VectorKnowledgeBase(this, "KnowledgeBase", {
+      vectorStore: this.vectorCollection,
+      embeddingsModel: model,
+      vectorField: "vector", // メソッドを保持したままのモデルを渡す
+      name: `${tag}-image-kb`,
+      description: `Knowledge base specialized in image analysis from S3`,
+    });
+
+    // 5. データソース
+    const s3DataSource = knowledgeBase.addS3DataSource({
+      bucket: dataSourceBucket,
+      dataSourceName: `${tag}-s3-image-source`,
+      chunkingStrategy: bedrock.ChunkingStrategy.NONE,
+    });
+
+    // 6. 同期用 Lambda
+    const syncLambda = new nodejs.NodejsFunction(this, "SyncLambda", {
+      entry: path.resolve(__dirname, '../../lambda/sync-kb/index.ts'),
+      runtime: lambda.Runtime.NODEJS_20_X,
+      environment: {
+        KNOWLEDGE_BASE_ID: knowledgeBase.knowledgeBaseId,
+        DATA_SOURCE_ID: s3DataSource.dataSourceId,
+      },
+    });
+
+    // 7. 権限と通知
+    syncLambda.addToRolePolicy(new aws_iam.PolicyStatement({
+      actions: ["bedrock:StartIngestionJob"],
+      resources: [knowledgeBase.knowledgeBaseArn],
+    }));
+
+    dataSourceBucket.addEventNotification(
+      aws_s3.EventType.OBJECT_CREATED,
+      new s3_notifications.LambdaDestination(syncLambda)
+    );
 
     // Outputs
-    // 【追加】Aさんが使用するリソース情報の出力
-    new CfnOutput(this, "RawVideoBucketName", {
-      value: rawVideoBucket.bucketName,
-      description: "Bucket for uploading raw video/audio files",
-    });
-
-    new CfnOutput(this, "SageMakerRoleArn", {
-      value: sagemakerRole.roleArn,
-      description: "IAM Role ARN for SageMaker processing job",
-    });
-
-
-    new CfnOutput(this, "KnowledgeBaseId", {
-      value: knowledgeBase.knowledgeBaseId,
-      description: "Knowledge Base ID",
-      exportName: `${tag}-kb-id`,
-    });
-
-    new CfnOutput(this, "KnowledgeBaseArn", {
-      value: knowledgeBase.knowledgeBaseArn,
-      description: "Knowledge Base ARN",
-      exportName: `${tag}-kb-arn`,
-    });
-
-    new CfnOutput(this, "S3BucketName", {
-      value: dataSourceBucket.bucketName,
-      description: "S3 bucket name for data sources",
-      exportName: `${tag}-s3-bucket`,
-    });
-
-    new CfnOutput(this, "VectorCollectionId", {
-      value: this.vectorCollection.collectionId,
-      description: "OpenSearch Serverless Collection ID",
-      exportName: `${tag}-collection-id`,
-    });
-
-    new CfnOutput(this, "VectorCollectionEndpoint", {
-      value: this.vectorCollection.collectionEndpoint,
-      description: "OpenSearch Serverless Collection Endpoint",
-    });
-
-    new CfnOutput(this, "TransformationBucketName", {
-      value: transformationBucket.bucketName,
-      description: "S3 bucket name for transformation intermediate storage",
-      exportName: `${tag}-transformation-bucket`,
-    });
-
-    new CfnOutput(this, "CodeChunkingLambdaArn", {
-      value: codeChunkingLambda.functionArn,
-      description: "Lambda function ARN for code chunking",
-      exportName: `${tag}-chunking-lambda-arn`,
-    });
-
-    // Output the AWS CLI commands to upload files to the S3 bucket
-    const uploadCommand = `aws s3 cp --recursive ./data s3://${bucketName}/documents/`;
-    new CfnOutput(this, "UploadCommand", {
-      value: uploadCommand,
-      description: "AWS CLI command to upload files to the S3 bucket",
-    });
+    new CfnOutput(this, "DataSourceBucketName", { value: dataSourceBucket.bucketName });
+    new CfnOutput(this, "KnowledgeBaseId", { value: knowledgeBase.knowledgeBaseId });
   }
 }

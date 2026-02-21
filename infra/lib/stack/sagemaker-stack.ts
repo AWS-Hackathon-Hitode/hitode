@@ -49,9 +49,9 @@ export class SageMakerStack extends cdk.Stack {
     });
 
     // 3. Endpoint
-    const endpoint = new sagemaker.CfnEndpoint(this, 'WhisperEndpoint', {
+    const endpoint = new sagemaker.CfnEndpoint(this, 'ImageEndpoint', {
       endpointConfigName: endpointConfig.attrEndpointConfigName,
-      endpointName: `Whisper-Realtime-Endpoint-${stage}`,
+      endpointName: `Image-Realtime-Endpoint-${stage}`,
     });
   }
 }
