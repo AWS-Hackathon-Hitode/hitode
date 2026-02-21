@@ -3,7 +3,9 @@
 services:
   # サービスA: web(Next.js)
   web:
-    image: mcr.microsoft.com/devcontainers/typescript-node:20-bookworm
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: bedrock-kb-webapp
     volumes:
       - ..:/workspaces
