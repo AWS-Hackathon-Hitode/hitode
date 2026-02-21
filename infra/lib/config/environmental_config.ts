@@ -21,6 +21,24 @@ export interface EnvironmentConfig {
   };
 
   /**
+   * Video Search の設定
+   */
+  videoSearch?: {
+    /**
+     * SageMaker Processing Job のインスタンスタイプ
+     */
+    sagemakerInstanceType: string;
+    /**
+     * Bedrock Embedding モデルID
+     */
+    embeddingModelId: string;
+    /**
+     * Bedrock OCR モデルID (Claude Vision)
+     */
+    ocrModelId: string;
+  };
+
+  /**
    * Bedrock Knowledge Base の設定
    */
   bedrockKb?: {
@@ -81,6 +99,11 @@ const environmentConfigs: { [key: string]: EnvironmentConfig } = {
     vpc: {
       cidr: "10.0.0.0/16",
       maxAzs: 2,
+    },
+    videoSearch: {
+      sagemakerInstanceType: "ml.m5.large",
+      embeddingModelId: "amazon.titan-embed-text-v2:0",
+      ocrModelId: "anthropic.claude-sonnet-4-20250514-v1:0",
     },
     bedrockKb: {
       embeddingModelArn:

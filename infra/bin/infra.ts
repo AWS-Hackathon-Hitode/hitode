@@ -4,6 +4,8 @@ import * as dotenv from "dotenv";
 import { getConfig } from "../lib/config/environmental_config";
 import { AmazonBedrockKbStack } from "../lib/stack/bedrock-kb-stack";
 import { SecretsStack } from "../lib/stack/secrets-stack";
+import { VideoStorageStack } from "../lib/stack/video-storage-stack";
+import { VideoProcessingStack } from "../lib/stack/video-processing-stack";
 
 dotenv.config();
 
@@ -57,3 +59,20 @@ new AmazonBedrockKbStack(app, `BedrockKbStack${stagePrefix}`, {
       : undefined,
   env,
 });
+
+// --- Video Search スタック ---
+const videoSearchConfig = config.videoSearch;
+if (videoSearchConfig) {
+  const videoStorageStack = new VideoStorageStack(
+    app,
+    `VideoStorageStack${stagePrefix}`,
+    { stage, env },
+  );
+
+  new VideoProcessingStack(app, `VideoProcessingStack${stagePrefix}`, {
+    stage,
+    config: videoSearchConfig,
+    bucket: videoStorageStack.bucket,
+    env,
+  });
+}
