@@ -132,6 +132,7 @@ function detectLanguage(filePath: string): SupportedLanguage | "text" | null {
     case "md":
     case "txt":
     case "json":
+    case "jsonl":
     case "yaml":
     case "yml":
     case "xml":
@@ -219,6 +220,56 @@ function chunkTextByParagraph(
   return chunks;
 }
 
+function chunkImageIndexJsonl(
+  content: string,
+  filePath: string,
+): Array<{ text: string; metadata: Record<string, string> }> {
+  const chunks: Array<{ text: string; metadata: Record<string, string> }> = [];
+  const lines = content
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  for (const [index, line] of lines.entries()) {
+    try {
+      const parsed = JSON.parse(line) as {
+        imageUrl?: string;
+        sourceKey?: string;
+        mimeType?: string;
+        caption?: string;
+        tags?: string[];
+      };
+
+      if (!parsed.imageUrl || !parsed.caption) {
+        continue;
+      }
+
+      const tags = Array.isArray(parsed.tags)
+        ? parsed.tags.filter((tag) => typeof tag === "string")
+        : [];
+      const text = `画像説明: ${parsed.caption}\nタグ: ${tags.join(", ")}\nimageUrl: ${parsed.imageUrl}`;
+
+      chunks.push({
+        text,
+        metadata: {
+          type: "image",
+          filePath,
+          imageUrl: parsed.imageUrl,
+          caption: parsed.caption,
+          tags: tags.join(", "),
+          sourceKey: parsed.sourceKey ?? "",
+          mimeType: parsed.mimeType ?? "",
+          lineNumber: (index + 1).toString(),
+        },
+      });
+    } catch (error) {
+      console.log(`Failed to parse JSONL line in ${filePath}:`, error);
+    }
+  }
+
+  return chunks;
+}
+
 export const handler = async (
   event: BedrockCustomTransformationEvent,
 ): Promise<BedrockCustomTransformationOutput> => {
@@ -258,7 +309,11 @@ export const handler = async (
 
     let chunks: Array<{ text: string; metadata: Record<string, string> }> = [];
 
-    if (!language) {
+    if (filePath.startsWith("documents/image-index/") && filePath.endsWith(".jsonl")) {
+      console.log(`Chunking ${filePath} as image-index jsonl`);
+      chunks = chunkImageIndexJsonl(sourceCode, filePath);
+      console.log(`Generated ${chunks.length} image metadata chunks`);
+    } else if (!language) {
       console.log(`Unsupported file type for ${filePath}, skipping`);
       // 空のチャンクで処理を続行
       chunks = [];

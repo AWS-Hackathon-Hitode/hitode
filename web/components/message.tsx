@@ -25,6 +25,31 @@ import { MessageReasoning } from "./message-reasoning";
 import { PreviewAttachment } from "./preview-attachment";
 import { Weather } from "./weather";
 
+type SearchKnowledgeBaseOutput = {
+  success: boolean;
+  message: string;
+  results: Array<{
+    index: number;
+    imageUrl?: string;
+    caption?: string;
+    tags?: string[];
+    relevance?: string;
+    content?: string;
+  }>;
+};
+
+function isSearchKnowledgeBaseOutput(
+  output: unknown,
+): output is SearchKnowledgeBaseOutput {
+  return (
+    typeof output === "object" &&
+    output !== null &&
+    "success" in output &&
+    "message" in output &&
+    "results" in output
+  );
+}
+
 const PurePreviewMessage = ({
   chatId,
   message,
@@ -258,6 +283,92 @@ const PurePreviewMessage = ({
                               result={part.output}
                               type="request-suggestions"
                             />
+                          )
+                        }
+                      />
+                    )}
+                  </ToolContent>
+                </Tool>
+              );
+            }
+
+            if (type === "tool-searchKnowledgeBase") {
+              const { toolCallId, state } = part;
+
+              return (
+                <Tool defaultOpen={true} key={toolCallId}>
+                  <ToolHeader state={state} type="tool-searchKnowledgeBase" />
+                  <ToolContent>
+                    {state === "input-available" && (
+                      <ToolInput input={part.input} />
+                    )}
+                    {state === "output-available" && (
+                      <ToolOutput
+                        errorText={undefined}
+                        output={
+                          !isSearchKnowledgeBaseOutput(part.output) ? (
+                            <div className="rounded border p-2 text-red-500">
+                              Invalid tool response shape.
+                            </div>
+                          ) : !part.output.success ? (
+                            <div className="rounded border p-2 text-red-500">
+                              {part.output.message}
+                            </div>
+                          ) : part.output.results.length === 0 ? (
+                            <div className="rounded border p-2 text-muted-foreground">
+                              {part.output.message}
+                            </div>
+                          ) : (
+                            <div className="space-y-3 p-2">
+                              <p className="font-medium text-sm">
+                                {part.output.message}
+                              </p>
+                              <div className="grid gap-3">
+                                {part.output.results.map((result) => (
+                                  <div
+                                    className="rounded border bg-background p-3"
+                                    key={`search-result-${result.index}`}
+                                  >
+                                    <div className="mb-2 flex items-center justify-between gap-2">
+                                      <p className="font-medium text-xs uppercase">
+                                        Result #{result.index}
+                                      </p>
+                                      {result.relevance && (
+                                        <span className="text-muted-foreground text-xs">
+                                          {result.relevance}
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {result.imageUrl && (
+                                      <img
+                                        alt={result.caption || "Retrieved image"}
+                                        className="mb-2 max-h-48 w-full rounded border object-cover"
+                                        src={result.imageUrl}
+                                      />
+                                    )}
+
+                                    {result.caption && (
+                                      <p className="mb-1 text-sm">
+                                        {result.caption}
+                                      </p>
+                                    )}
+
+                                    {result.tags && result.tags.length > 0 && (
+                                      <p className="mb-1 text-muted-foreground text-xs">
+                                        Tags: {result.tags.join(", ")}
+                                      </p>
+                                    )}
+
+                                    {!result.caption && result.content && (
+                                      <p className="line-clamp-3 text-muted-foreground text-xs">
+                                        {result.content}
+                                      </p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
                           )
                         }
                       />

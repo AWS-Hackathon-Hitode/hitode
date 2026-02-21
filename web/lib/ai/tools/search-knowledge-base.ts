@@ -7,15 +7,20 @@ import {
 
 export const searchKnowledgeBase = tool({
   description:
-    "Search the knowledge base for relevant information about the codebase, documentation, technical decisions, requirements, and design. Use this tool when you need to answer questions about: system architecture, code implementation, technical specifications, project requirements, design decisions, meeting notes, or any other project documentation.",
+    "Search the knowledge base for relevant information about the codebase, documentation, technical decisions, requirements, design, and indexed images. Use this tool when you need to answer questions about: system architecture, code implementation, technical specifications, project requirements, design decisions, meeting notes, or to retrieve related images by text query.",
   inputSchema: z.object({
     query: z
       .string()
+      .min(1)
+      .max(300)
       .describe(
         "The search query to find relevant information in the knowledge base",
       ),
     numberOfResults: z
       .number()
+      .int()
+      .min(1)
+      .max(10)
       .optional()
       .default(5)
       .describe("Number of results to retrieve (default: 5)"),
@@ -45,6 +50,11 @@ export const searchKnowledgeBase = tool({
         context: formattedContext,
         results: results.map((result, index) => ({
           index: index + 1,
+          imageUrl: result.imageUrl,
+          caption: result.caption,
+          tags: result.tags ?? [],
+          sourceKey: result.sourceKey,
+          mimeType: result.mimeType,
           content: result.content,
           relevance: result.score
             ? `${(result.score * 100).toFixed(1)}%`

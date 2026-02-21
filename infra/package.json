@@ -9,6 +9,7 @@
     "watch": "tsc -w",
     "test": "jest",
     "cdk": "cdk",
+    "image:index:batch": "ts-node scripts/image-index-batch.ts",
     "lint": "biome check",
     "format": "biome format --write"
   },
@@ -24,6 +25,8 @@
     "typescript": "~5.9.3"
   },
   "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.940.0",
+    "@aws-sdk/client-s3": "^3.940.0",
     "@cdklabs/generative-ai-cdk-constructs": "^0.1.312",
     "aws-cdk-lib": "2.225.0",
     "constructs": "^10.4.3",
