@@ -1,90 +1,122 @@
 import * as path from "node:path";
 import * as cdk from "aws-cdk-lib";
+import { Construct } from "constructs";
+
 import {
-  aws_iam,
-  aws_s3,
+  aws_s3 as s3,
+  aws_iam as iam,
   aws_lambda as lambda,
   aws_lambda_nodejs as nodejs,
-  CfnOutput,
+  aws_s3_notifications as s3n,
   RemovalPolicy,
+  CfnOutput,
 } from "aws-cdk-lib";
-import * as s3_notifications from "aws-cdk-lib/aws-s3-notifications";
+
 import {
   bedrock,
   opensearchserverless,
 } from "@cdklabs/generative-ai-cdk-constructs";
-import type { Construct } from "constructs";
-import { getConfig } from "../config/environmental_config";
 
 interface BedrockKbStackProps extends cdk.StackProps {
   stage: string;
 }
 
 export class AmazonBedrockKbStack extends cdk.Stack {
-  public readonly vectorCollection: opensearchserverless.VectorCollection;
-
   constructor(scope: Construct, id: string, props: BedrockKbStackProps) {
     super(scope, id, props);
 
-    const { stage } = props;
-    const config = getConfig(stage);
-    const tag = `bedrock-kb-${stage}`;
+    const tag = `bedrock-kb-${props.stage}`;
 
-    // 1. バケット定義
-    const rawImageBucket = new aws_s3.Bucket(this, "RawImageBucket", {
-      bucketName: `${tag}-raw-image-${this.account}-${this.region}`,
+    /* =========================
+       1. Upload用バケット
+       ========================= */
+
+    const rawBucket = new s3.Bucket(this, "RawImageBucket", {
+      bucketName: `${tag}-raw-${this.account}-${this.region}`,
       removalPolicy: RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      cors: [
+        {
+          allowedMethods: [s3.HttpMethods.PUT],
+          allowedOrigins: ["http://localhost:3000"],
+          allowedHeaders: ["*"],
+        },
+      ],
     });
 
-    const dataSourceBucket = new aws_s3.Bucket(this, "DataSourceBucket", {
-      bucketName: `${tag}-data-source-${this.account}-${this.region}`,
+    /* =========================
+       2. KB DataSource用バケット
+       ========================= */
+
+    const dataSourceBucket = new s3.Bucket(this, "DataSourceBucket", {
+      bucketName: `${tag}-datasource-${this.account}-${this.region}`,
       removalPolicy: RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
       versioned: true,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
     });
 
-    // 2. SageMaker ロール
-    const sagemakerRole = new aws_iam.Role(this, "SageMakerRole", {
-      assumedBy: new aws_iam.ServicePrincipal("sagemaker.amazonaws.com"),
-    });
-    rawImageBucket.grantRead(sagemakerRole);
-    dataSourceBucket.grantReadWrite(sagemakerRole);
-    sagemakerRole.addManagedPolicy(
-      aws_iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSageMakerFullAccess")
+    /* =========================
+       3. OpenSearch Serverless
+       ========================= */
+
+    const vectorCollection =
+      new opensearchserverless.VectorCollection(this, "VectorCollection", {
+        collectionName: `${tag}-collection`,
+        standbyReplicas:
+          opensearchserverless.VectorCollectionStandbyReplicas.DISABLED,
+      });
+
+    /* =========================
+       4. Knowledge Base
+       ========================= */
+
+    const knowledgeBase = new bedrock.VectorKnowledgeBase(
+      this,
+      "KnowledgeBase",
+      {
+        vectorStore: vectorCollection,
+        embeddingsModel:
+          bedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V1,
+        vectorField: "vector",
+        name: `${tag}-kb`,
+        description: "Image Knowledge Base",
+      }
     );
 
-    // 3. OpenSearch Serverless
-    this.vectorCollection = new opensearchserverless.VectorCollection(this, "VectorCollection", {
-      collectionName: `${tag}-collection`,
-      standbyReplicas: opensearchserverless.VectorCollectionStandbyReplicas.DISABLED,
-    });
-
-
-    // 4. Knowledge Base (ここが重要：バリデーション回避)
-    // 一旦、標準の V1 モデルとしてインスタンスを作成
-    const model = bedrock.BedrockFoundationModel.TITAN_EMBED_TEXT_V1;
-
-    // 型定義の裏をかいて、modelId と次元数を「画像用」に直接上書きする
-    // (JavaScript の柔軟性を利用して、読み取り専用プロパティを書き換えます)
-    const knowledgeBase = new bedrock.VectorKnowledgeBase(this, "KnowledgeBase", {
-      vectorStore: this.vectorCollection,
-      embeddingsModel: model,
-      vectorField: "vector", // メソッドを保持したままのモデルを渡す
-      name: `${tag}-image-kb`,
-      description: `Knowledge base specialized in image analysis from S3`,
-    });
-
-    // 5. データソース
     const s3DataSource = knowledgeBase.addS3DataSource({
       bucket: dataSourceBucket,
-      dataSourceName: `${tag}-s3-image-source`,
+      dataSourceName: `${tag}-s3-source`,
       chunkingStrategy: bedrock.ChunkingStrategy.NONE,
     });
 
-    // 6. 同期用 Lambda
+    /* =========================
+       5. Raw → DataSource Copy Lambda
+       ========================= */
+
+    const copyLambda = new nodejs.NodejsFunction(this, "CopyLambda", {
+      entry: path.resolve(__dirname, "../../lambda/copy/index.ts"),
+      runtime: lambda.Runtime.NODEJS_20_X,
+      environment: {
+        TARGET_BUCKET: dataSourceBucket.bucketName,
+      },
+    });
+
+    rawBucket.grantRead(copyLambda);
+    dataSourceBucket.grantWrite(copyLambda);
+
+    rawBucket.addEventNotification(
+      s3.EventType.OBJECT_CREATED,
+      new s3n.LambdaDestination(copyLambda)
+    );
+
+    /* =========================
+       6. Ingestion Lambda
+       ========================= */
+
     const syncLambda = new nodejs.NodejsFunction(this, "SyncLambda", {
-      entry: path.resolve(__dirname, '../../lambda/sync-kb/index.ts'),
+      entry: path.resolve(__dirname, "../../lambda/sync-kb/index.ts"),
       runtime: lambda.Runtime.NODEJS_20_X,
       environment: {
         KNOWLEDGE_BASE_ID: knowledgeBase.knowledgeBaseId,
@@ -92,19 +124,32 @@ export class AmazonBedrockKbStack extends cdk.Stack {
       },
     });
 
-    // 7. 権限と通知
-    syncLambda.addToRolePolicy(new aws_iam.PolicyStatement({
-      actions: ["bedrock:StartIngestionJob"],
-      resources: [knowledgeBase.knowledgeBaseArn],
-    }));
-
-    dataSourceBucket.addEventNotification(
-      aws_s3.EventType.OBJECT_CREATED,
-      new s3_notifications.LambdaDestination(syncLambda)
+    syncLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["bedrock:StartIngestionJob"],
+        resources: [knowledgeBase.knowledgeBaseArn],
+      })
     );
 
-    // Outputs
-    new CfnOutput(this, "DataSourceBucketName", { value: dataSourceBucket.bucketName });
-    new CfnOutput(this, "KnowledgeBaseId", { value: knowledgeBase.knowledgeBaseId });
+    dataSourceBucket.addEventNotification(
+      s3.EventType.OBJECT_CREATED,
+      new s3n.LambdaDestination(syncLambda)
+    );
+
+    /* =========================
+       7. Outputs
+       ========================= */
+
+    new CfnOutput(this, "RawImageBucketName", {
+      value: rawBucket.bucketName,
+    });
+
+    new CfnOutput(this, "DataSourceBucketName", {
+      value: dataSourceBucket.bucketName,
+    });
+
+    new CfnOutput(this, "KnowledgeBaseId", {
+      value: knowledgeBase.knowledgeBaseId,
+    });
   }
 }

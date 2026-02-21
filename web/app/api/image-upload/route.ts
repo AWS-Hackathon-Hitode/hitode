@@ -25,6 +25,14 @@ export async function POST(req: Request) {
   const imageId = randomUUID();
   const key = `raw-images/${imageId}/${filename}`;
 
+  const s3 = new S3Client({
+    region: process.env.AWS_REGION ?? "us-east-1",
+  });
+
+  const BUCKET = process.env.RAW_IMAGE_BUCKET!;
+
+  console.log("Using bucket:", BUCKET);
+
   const command = new PutObjectCommand({
     Bucket: BUCKET,
     Key: key,
