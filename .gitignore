@@ -1,0 +1,56 @@
+# --- General ---
+node_modules
+.DS_Store
+*.log
+.eslintcache
+.stylelintcache
+.biome/cache
+
+# --- Next.js (web/) ---
+/web/.next/
+/web/out/
+/web/build
+/web/.env
+/web/.env.local
+/web/.env.production.local
+/web/.env.test.local
+/web/.env.development.local
+
+# --- AWS CDK (infra/) ---
+/infra/cdk.out/
+/infra/.template.json
+/infra/diagram.dot
+/infra/test/results/
+
+# --- Database & Drizzle ---
+/web/drizzle/migrations/meta
+/web/drizzle/migrations/*.sql
+# マイグレーションファイル自体を管理に含める場合は上記を外し、
+# 秘匿情報が含まれる可能性がある場合のみ除外してください
+
+# --- TypeScript ---
+*.tsbuildinfo
+/infra/lib/**/*.js
+/infra/lib/**/*.d.ts
+/infra/bin/**/*.js
+/infra/bin/**/*.d.ts
+
+# --- IDE & Editors ---
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# --- Env / Secrets ---
+.env
+.env.*
+!.env.example
+*.pem
+
+.gitignore
