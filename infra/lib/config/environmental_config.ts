@@ -84,7 +84,7 @@ const environmentConfigs: { [key: string]: EnvironmentConfig } = {
     },
     bedrockKb: {
       embeddingModelArn:
-        "arn:aws:bedrock:ap-northeast-1::foundation-model/amazon.titan-embed-text-v1",
+        "arn:aws:bedrock:ap-northeast-1::foundation-model/amazon.titan-embed-text-v2",
       aurora: {
         instanceType: "t3.medium",
         version: "16.4",

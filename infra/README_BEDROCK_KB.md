@@ -101,6 +101,39 @@ bedrockKb: {
    aws bedrock start-ingestion-job --knowledge-base-id [kb-id] --data-source-id [ds-id]
    ```
 
+## 画像RAG（事前バッチ）手順
+
+`documents/images/` に置いた画像をVLMで説明文・タグ化し、`documents/image-index/` にJSONLを生成します。
+
+1. 画像をS3に配置:
+
+   ```bash
+   aws s3 cp --recursive ./images s3://<bucket-name>/documents/images/
+   ```
+
+2. 画像索引バッチを実行:
+
+   ```bash
+   cd infra
+   pnpm image:index:batch
+   ```
+
+3. Knowledge Base ingestionを実行:
+
+   ```bash
+   aws bedrock-agent start-ingestion-job \
+     --knowledge-base-id <kb-id> \
+     --data-source-id <data-source-id>
+   ```
+
+4. スモークテスト:
+
+   ```text
+   みかん
+   ```
+
+   検索結果に `imageUrl` と `caption` が含まれていれば成功です。
+
 ## 主要な機能
 
 ### VPC設定
