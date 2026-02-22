@@ -92,23 +92,51 @@ export class AmazonBedrockKbStack extends cdk.Stack {
     });
 
     /* =========================
-       5. Raw → DataSource Copy Lambda
+       5. Image OCR Lambda (Raw → テキスト抽出 → DataSource)
        ========================= */
 
-    const copyLambda = new nodejs.NodejsFunction(this, "CopyLambda", {
-      entry: path.resolve(__dirname, "../../lambda/copy/index.ts"),
-      runtime: lambda.Runtime.NODEJS_20_X,
+    const ocrLambda = new nodejs.NodejsFunction(this, "ImageOcrLambda", {
+      functionName: `${tag}-image-ocr`,
+      entry: path.resolve(__dirname, "../lambda/image-ocr/index.ts"),
+      runtime: lambda.Runtime.NODEJS_22_X,
+      handler: "handler",
+      timeout: cdk.Duration.minutes(5),
+      memorySize: 1024,
       environment: {
-        TARGET_BUCKET: dataSourceBucket.bucketName,
+        RAW_BUCKET: rawBucket.bucketName,
+        DATA_SOURCE_BUCKET: dataSourceBucket.bucketName,
+        VLM_MODEL_ID: "us.anthropic.claude-sonnet-4-20250514-v1:0",
       },
+      bundling: { externalModules: [] },
     });
 
-    rawBucket.grantRead(copyLambda);
-    dataSourceBucket.grantWrite(copyLambda);
+    rawBucket.grantRead(ocrLambda);
+    dataSourceBucket.grantWrite(ocrLambda);
+
+    ocrLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["bedrock:InvokeModel"],
+        resources: [
+          `arn:aws:bedrock:${this.region}:${this.account}:inference-profile/us.anthropic.claude-sonnet-4-20250514-v1:0`,
+          "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-20250514-v1:0",
+        ],
+      }),
+    );
+
+    ocrLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: [
+          "aws-marketplace:ViewSubscriptions",
+          "aws-marketplace:Subscribe",
+        ],
+        resources: ["*"],
+      }),
+    );
 
     rawBucket.addEventNotification(
       s3.EventType.OBJECT_CREATED,
-      new s3n.LambdaDestination(copyLambda)
+      new s3n.LambdaDestination(ocrLambda),
+      { prefix: "raw-images/" },
     );
 
     /* =========================
