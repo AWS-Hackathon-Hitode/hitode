@@ -3,7 +3,12 @@ import { getToken } from "next-auth/jwt";
 import { guestRegex, isDevelopmentEnvironment } from "./lib/constants";
 
 export async function middleware(request: NextRequest) {
+
+  
   const { pathname } = request.nextUrl;
+  if (pathname.startsWith("/api/upload-url")) {
+  return NextResponse.next();
+  }
 
   /*
    * Playwright starts the dev server and requires a 200 status to

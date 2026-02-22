@@ -32,6 +32,9 @@ export async function retrieveFromKnowledgeBase(
   knowledgeBaseId?: string,
   numberOfResults = 5,
 ): Promise<RetrievalResult[]> {
+
+  console.log("[KB] retrieveFromKnowledgeBase called", { query });
+
   const kbId = knowledgeBaseId || process.env.KNOWLEDGE_BASE_ID;
 
   if (!kbId) {

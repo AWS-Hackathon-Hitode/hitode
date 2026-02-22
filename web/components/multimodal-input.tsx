@@ -1,5 +1,5 @@
 "use client";
-
+import { S3Uploader } from "./uploader";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import { Trigger } from "@radix-ui/react-select";
 import type { UIMessage } from "ai";
@@ -367,6 +367,12 @@ function PureMultimodalInput({
           />{" "}
           <Context {...contextProps} />
         </div>
+
+        #画像アップロードのUIを追加
+        <div className="mt-1 px-2">
+          <S3Uploader disabled={status !== "ready"} />
+        </div>
+
         <PromptInputToolbar className="!border-top-0 border-t-0! p-0 shadow-none dark:border-0 dark:border-transparent!">
           <PromptInputTools className="gap-0 sm:gap-0.5">
             <AttachmentsButton
