@@ -263,3 +263,5 @@ vercel env pull
 - [Vercel AI Chatbot Template](https://github.com/vercel/ai-chatbot)
 - [Vercel AI SDK](https://sdk.vercel.ai)
 - [shadcn/ui](https://ui.shadcn.com)
+
+> Use web/.env.local for local/devcontainer setup (required: AUTH_SECRET, POSTGRES_URL, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, KNOWLEDGE_BASE_ID, RAW_IMAGE_BUCKET).
