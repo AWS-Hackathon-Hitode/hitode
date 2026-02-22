@@ -22,6 +22,7 @@ const SUPPORTED_EXTENSIONS = new Set([
   ".png",
   ".gif",
   ".webp",
+  ".pdf",
 ]);
 
 export const handler = async (event: S3Event) => {
@@ -56,7 +57,8 @@ export const handler = async (event: S3Event) => {
       const mediaType = resolveMediaType(ext);
 
       // 2. Claude Vision で OCR + 説明文生成
-      const analysis = await analyzeImage(base64Image, mediaType);
+      const isPdf = ext === ".pdf";
+      const analysis = await analyzeImage(base64Image, mediaType, isPdf);
       console.log(
         `Analysis done — ocr: "${analysis.ocrText.slice(0, 60)}", desc: "${analysis.description.slice(0, 60)}"`,
       );
@@ -97,7 +99,26 @@ export const handler = async (event: S3Event) => {
 async function analyzeImage(
   base64Image: string,
   mediaType: string,
+  isPdf: boolean,
 ): Promise<{ ocrText: string; description: string }> {
+  const fileContent = isPdf
+    ? {
+        type: "document" as const,
+        source: {
+          type: "base64" as const,
+          media_type: "application/pdf" as const,
+          data: base64Image,
+        },
+      }
+    : {
+        type: "image" as const,
+        source: {
+          type: "base64" as const,
+          media_type: mediaType,
+          data: base64Image,
+        },
+      };
+
   const response = await bedrock.send(
     new InvokeModelCommand({
       modelId: VLM_MODEL_ID,
@@ -110,14 +131,7 @@ async function analyzeImage(
           {
             role: "user",
             content: [
-              {
-                type: "image",
-                source: {
-                  type: "base64",
-                  media_type: mediaType,
-                  data: base64Image,
-                },
-              },
+              fileContent,
               {
                 type: "text",
                 text: `この画像を分析してください。以下の2つの情報をJSON形式で返してください。
@@ -158,5 +172,6 @@ function resolveMediaType(ext: string): string {
   if (ext === ".png") return "image/png";
   if (ext === ".gif") return "image/gif";
   if (ext === ".webp") return "image/webp";
+  if (ext === ".pdf") return "application/pdf";
   return "image/jpeg";
 }
