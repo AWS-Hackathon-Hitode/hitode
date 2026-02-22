@@ -3,12 +3,6 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 
-const s3 = new S3Client({
-  region: process.env.AWS_REGION ?? "us-east-1",
-});
-
-const BUCKET = process.env.RAW_IMAGE_BUCKET!;
-
 export async function POST(req: Request) {
   const { filename, contentType } = (await req.json()) as {
     filename: string;
@@ -22,24 +16,47 @@ export async function POST(req: Request) {
     );
   }
 
+  const missingEnvs = [
+    "AWS_REGION",
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "RAW_IMAGE_BUCKET",
+  ].filter((key) => !process.env[key]);
+
+  if (missingEnvs.length > 0) {
+    const errorMessage = `Missing environment variables: ${missingEnvs.join(
+      ", ",
+    )}`;
+    console.error(errorMessage);
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
+  }
+
   const imageId = randomUUID();
   const key = `raw-images/${imageId}/${filename}`;
 
-  const s3 = new S3Client({
-    region: process.env.AWS_REGION ?? "us-east-1",
-  });
+  try {
+    const s3 = new S3Client({
+      region: process.env.AWS_REGION!,
+    });
 
-  const BUCKET = process.env.RAW_IMAGE_BUCKET!;
+    const BUCKET = process.env.RAW_IMAGE_BUCKET!;
 
-  console.log("Using bucket:", BUCKET);
+    console.log("Using bucket:", BUCKET);
 
-  const command = new PutObjectCommand({
-    Bucket: BUCKET,
-    Key: key,
-    ContentType: contentType,
-  });
+    const command = new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: key,
+      ContentType: contentType,
+    });
 
-  const presignedUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
+    const presignedUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
 
-  return NextResponse.json({ imageId, presignedUrl, key });
+    return NextResponse.json({ imageId, presignedUrl, key });
+  } catch (e) {
+    console.error(e);
+    return NextResponse.json(
+      { error: "Error creating presigned URL" },
+      { status: 500 },
+    );
+  }
 }
