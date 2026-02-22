@@ -29,6 +29,7 @@
     "@aws-sdk/client-s3": "^3.995.0",
     "aws-cdk-lib": "2.239.0",
     "constructs": "10.5.1",
+    "@aws-sdk/client-bedrock-runtime": "^3.995.0",
     "dotenv": "^17.2.3",
     "zod": "^4.1.13"
   },
