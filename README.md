@@ -78,3 +78,67 @@ hitode/
 │
 └── README.md             # このファイル
 ```
+
+## 🚀 クイックスタート
+
+### 1. リポジトリのクローン
+
+```bash
+git clone <repository-url>
+cd bedrock-kb-chatbot
+```
+
+VSCode から [bedrock-kb-chatbot.code-workspace](./bedrock-kb-chatbot.code-workspace) ファイルを開いて、マルチプロジェクト構成でワークスペースを開きます。
+
+### 2. インフラストラクチャのセットアップ
+
+```bash
+cd infra
+pnpm install
+pnpm build
+pnpm cdk deploy
+```
+
+詳細な手順は [infra/README.md](./infra/README.md) を参照してください。
+
+### 3. アプリケーションの起動
+
+```bash
+cd web
+pnpm install
+pnpm db:migrate  # データベースのセットアップ
+pnpm dev         # 開発サーバーの起動
+```
+
+ブラウザで [http://localhost:3000](http://localhost:3000) を開いてアプリケーションを確認します。
+
+詳細な手順は [web/README.md](./web/README.md) を参照してください。
+
+## 📝 開発コマンド
+
+### Web アプリケーション (web/)
+
+```bash
+pnpm dev        # 開発サーバーの起動（Turbopack）
+pnpm build      # プロダクションビルド
+pnpm start      # プロダクションサーバーの起動
+pnpm lint       # Biome によるコード検査
+pnpm format     # Biome によるコードフォーマット
+pnpm db:migrate # データベースマイグレーション
+pnpm db:studio  # Drizzle Studio（データベース GUI）
+```
+
+### インフラストラクチャ (infra/)
+
+```bash
+pnpm build      # TypeScript のビルド
+pnpm watch      # ファイル変更の監視とビルド
+pnpm test       # Jest によるテスト実行
+pnpm cdk synth  # CloudFormation テンプレートの生成
+pnpm cdk deploy # AWS へのデプロイ
+pnpm cdk diff   # 変更内容の確認
+pnpm lint       # Biome によるコード検査
+pnpm format     # Biome によるコードフォーマット
+```
+
+c

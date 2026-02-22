@@ -55,3 +55,4 @@ node_modules
 *.pem
 
 .gitignore
+.pnpm-store/*
