@@ -81,10 +81,17 @@ export default function ImageChatPage() {
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* Header */}
-      <div className="border-b px-4 py-3 flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Image Chat</h1>
-        <a href="/images" className="text-sm text-muted-foreground hover:underline">
-          Search Mode
+      <div className="border-b px-4 py-3 flex items-center justify-between bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary text-primary-foreground font-bold text-sm">
+            H
+          </div>
+          <h1 className="text-lg font-semibold tracking-tight">Hitode</h1>
+        </div>
+        <a href="/images">
+          <Button variant="outline" size="sm">
+            Upload
+          </Button>
         </a>
       </div>
 
@@ -93,7 +100,7 @@ export default function ImageChatPage() {
         <div className="mx-auto max-w-2xl space-y-6">
           {messages.length === 0 && (
             <div className="text-center text-muted-foreground mt-20">
-              <p className="text-2xl mb-2">Image Chat</p>
+              <p className="text-2xl mb-2">画像に関するチャット</p>
               <p className="text-sm">
                 画像について質問してみてください
               </p>
@@ -150,15 +157,23 @@ export default function ImageChatPage() {
                           <div
                             className={`${expandedImages.has(img.imageId) ? "" : "aspect-square"} relative bg-muted`}
                           >
-                            <img
-                              src={img.imageUrl}
-                              alt={img.filename}
-                              className="object-contain w-full h-full"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).style.display =
-                                  "none";
-                              }}
-                            />
+                            {img.filename.toLowerCase().endsWith(".pdf") ? (
+                              <iframe
+                                src={img.imageUrl}
+                                title={img.filename}
+                                className="w-full h-full"
+                              />
+                            ) : (
+                              <img
+                                src={img.imageUrl}
+                                alt={img.filename}
+                                className="object-contain w-full h-full"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display =
+                                    "none";
+                                }}
+                              />
+                            )}
                           </div>
                           <CardContent className="p-2">
                             <span className="text-xs text-muted-foreground">
@@ -203,7 +218,7 @@ export default function ImageChatPage() {
             className="flex-1"
           />
           <Button type="submit" disabled={isLoading || !input.trim()}>
-            Send
+            送信
           </Button>
         </form>
       </div>

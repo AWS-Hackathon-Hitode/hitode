@@ -104,25 +104,38 @@ export default function ImagesPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-4xl px-4 py-8">
-        <h1 className="text-3xl font-bold mb-8">Image Search</h1>
+      {/* Header */}
+      <div className="border-b px-4 py-3 flex items-center justify-between bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary text-primary-foreground font-bold text-sm">
+            H
+          </div>
+          <h1 className="text-lg font-semibold tracking-tight">Hitode</h1>
+        </div>
+        <a href="/image-chat">
+          <Button variant="outline" size="sm">
+            Chat
+          </Button>
+        </a>
+      </div>
 
+      <div className="mx-auto max-w-4xl px-4 py-8">
         {/* Upload Section */}
         <Card className="mb-8">
           <CardContent className="pt-6">
-            <h2 className="text-lg font-semibold mb-4">Upload Images</h2>
+            <h2 className="text-lg font-semibold mb-4">画像アップロード</h2>
             <div className="flex gap-3 items-center">
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/gif,image/webp"
+                accept="image/jpeg,image/png,image/gif,image/webp,application/pdf"
                 multiple
                 onChange={(e) => handleUpload(e.target.files)}
                 className="flex-1 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
               />
               {isUploading && (
                 <span className="text-sm text-muted-foreground animate-pulse">
-                  Uploading...
+                  アップロード中...
                 </span>
               )}
             </div>
@@ -160,7 +173,7 @@ export default function ImagesPage() {
         {/* Search Section */}
         <Card className="mb-8">
           <CardContent className="pt-6">
-            <h2 className="text-lg font-semibold mb-4">Search Images</h2>
+            <h2 className="text-lg font-semibold mb-4">画像検索</h2>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -175,7 +188,7 @@ export default function ImagesPage() {
                 className="flex-1"
               />
               <Button type="submit" disabled={isSearching || !query.trim()}>
-                {isSearching ? "Searching..." : "Search"}
+                {isSearching ? "検索中..." : "検索"}
               </Button>
             </form>
           </CardContent>
@@ -185,24 +198,32 @@ export default function ImagesPage() {
         {searched && (
           <div>
             <h2 className="text-lg font-semibold mb-4">
-              Results{results.length > 0 && ` (${results.length})`}
+              検索結果{results.length > 0 && `（${results.length}件）`}
             </h2>
 
             {results.length === 0 ? (
-              <p className="text-muted-foreground">No images found.</p>
+              <p className="text-muted-foreground">画像が見つかりませんでした。</p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {results.map((r) => (
                   <Card key={r.imageId} className="overflow-hidden">
                     <div className="aspect-video relative bg-muted">
-                      <img
-                        src={r.imageUrl}
-                        alt={r.filename}
-                        className="object-contain w-full h-full"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = "none";
-                        }}
-                      />
+                      {r.filename.toLowerCase().endsWith(".pdf") ? (
+                        <iframe
+                          src={r.imageUrl}
+                          title={r.filename}
+                          className="w-full h-full"
+                        />
+                      ) : (
+                        <img
+                          src={r.imageUrl}
+                          alt={r.filename}
+                          className="object-contain w-full h-full"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = "none";
+                          }}
+                        />
+                      )}
                     </div>
                     <CardContent className="pt-4">
                       <div className="flex justify-between items-start mb-2">
